@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dünya Haritası Rehberi</title>
+<style>
+:root{--sea:#cfe3f3;--land:#8fb4d6;--hov:#e8a33d;--sel:#d9534f;--panel:#fff;--tx:#1b2430;--mut:#5b6877;--chip:#eaf1f8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sea:#0f1c2b;--land:#3f6489;--hov:#d18a22;--sel:#e0605c;--panel:#18232f;--tx:#e7edf3;--mut:#9db0c3;--chip:#243545}}
+:root[data-theme="dark"]{--sea:#0f1c2b;--land:#3f6489;--hov:#d18a22;--sel:#e0605c;--panel:#18232f;--tx:#e7edf3;--mut:#9db0c3;--chip:#243545}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--sea);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--tx)}
+#app{display:flex;height:100%}
+#side{display:none;width:380px;flex:none;background:var(--panel);overflow:auto;padding:22px 20px;box-shadow:2px 0 14px rgba(0,0,0,.18);z-index:5}#side.open{display:block}
+#x{position:sticky;top:0;float:right;width:32px;height:32px;border:0;border-radius:50%;background:var(--chip);color:var(--tx);font-size:20px;line-height:1;cursor:pointer;z-index:6}
+#hint{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--panel);color:var(--tx);padding:8px 18px;border-radius:999px;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:.9rem;z-index:3;pointer-events:none}
+#stage{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden}
+#map{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+h1{font-size:1.5rem;margin:0 0 4px}
+.flag{font-size:2.4rem;line-height:1}
+h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:20px 0 8px}
+p{color:var(--mut);line-height:1.5;margin:6px 0}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+li{background:var(--chip);border-radius:999px;padding:6px 12px;font-size:.9rem}
+a{color:var(--hov)}
+.car{position:relative}
+.fact{background:var(--chip);border-radius:12px;padding:6px 14px}.fact p{margin:7px 0;color:var(--tx);font-size:.92rem;line-height:1.5}
+.inf{color:var(--tx);font-size:.92rem;line-height:1.6;margin:0 0 6px}.more{font-size:.85rem}
+.ph{background-size:200% 200%;animation:sh 3s ease infinite}@keyframes sh{50%{background-position:100% 100%}}
+.trk{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.trk::-webkit-scrollbar{display:none}
+.card{flex:0 0 80%;scroll-snap-align:start;background:var(--chip);border-radius:12px;overflow:hidden;color:inherit;text-decoration:none;display:flex;flex-direction:column}
+.ph{height:150px;display:grid;place-items:center;font-size:2.4rem;background:linear-gradient(135deg,var(--land),var(--hov))}
+.ph img{width:100%;height:100%;object-fit:cover}
+.tx{padding:10px 12px}.tx b{display:block;margin-bottom:4px}.tx span{display:block;font-size:.8rem;color:var(--mut);line-height:1.4}
+.nv{position:absolute;top:60px;z-index:2;width:30px;height:30px;border-radius:50%;border:0;background:var(--panel);color:var(--tx);box-shadow:0 1px 5px rgba(0,0,0,.4);cursor:pointer;font-size:18px;line-height:1}
+.nv.l{left:4px}.nv.r{right:4px}
+.jvm-container{position:relative;overflow:hidden;width:100%;height:100%;touch-action:none}
+.jvm-container svg{display:block}
+.jvm-region{fill:var(--land);stroke:var(--panel);stroke-width:.5;cursor:pointer;transition:fill .15s}
+.jvm-region:hover{fill:var(--hov)!important}
+.jvm-region.sel{fill:var(--sel)!important}
+.jvm-zoom-btn{position:absolute;left:12px;width:32px;height:32px;line-height:30px;text-align:center;border-radius:6px;background:var(--panel);color:var(--tx);font-size:20px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3);user-select:none}
+.jvm-zoomin{top:12px}.jvm-zoomout{top:52px}
+.jvm-tooltip{position:absolute;display:none;padding:4px 9px;background:#111;color:#fff;border-radius:5px;font-size:13px;pointer-events:none;white-space:nowrap;z-index:20}
+.jvm-tooltip.active{display:block}
+@media (max-width:700px){#app{flex-direction:column-reverse}#side{width:auto;height:45%;flex:none;box-shadow:0 -2px 14px rgba(0,0,0,.2)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side"><button id="x" aria-label="Kapat">×</button><div id="panel"></div></aside>
+  <div id="stage"><div id="hint">Bir ülkeye tıklayın</div><div id="map"></div></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
+<script>
+// Format: KOD:"Gezilecek ve tarihi yerler|Önemli şahsiyetler"
+const D={
+TR:"Ayasofya;Kapadokya;Efes Antik Kenti;Pamukkale;Göbeklitepe;Nemrut Dağı|Atatürk;Mevlana;Mimar Sinan;Fatih Sultan Mehmet;Yunus Emre",
+US:"Büyük Kanyon;Özgürlük Heykeli;Yellowstone;Times Meydanı;Golden Gate Köprüsü|George Washington;Abraham Lincoln;Martin Luther King Jr.;Thomas Edison;Benjamin Franklin",
+CA:"Niagara Şelaleleri;Banff Milli Parkı;CN Kulesi;Québec Eski Şehir|Alexander Graham Bell;Terry Fox;Frederick Banting",
+MX:"Chichén Itzá;Teotihuacán;Zócalo (Mexico City);Tulum|Frida Kahlo;Diego Rivera;Benito Juárez;Emiliano Zapata",
+BR:"Kurtarıcı İsa Heykeli;Iguaçu Şelaleleri;Amazon Ormanları;Copacabana|Pelé;Santos-Dumont;Oscar Niemeyer;Ayrton Senna",
+AR:"Iguazú Şelaleleri;Perito Moreno Buzulu;Buenos Aires;Patagonya|Diego Maradona;Lionel Messi;Che Guevara;Jorge Luis Borges",
+CL:"Paskalya Adası;Atacama Çölü;Torres del Paine|Pablo Neruda;Salvador Allende;Gabriela Mistral",
+PE:"Machu Picchu;Nazca Çizgileri;Cusco|Túpac Amaru II;Mario Vargas Llosa;Pachacútec",
+CO:"Cartagena;Kahve Bölgesi;Ciudad Perdida|Gabriel García Márquez;Simón Bolívar;Shakira",
+VE:"Angel Şelalesi;Roraima Dağı;Los Roques|Simón Bolívar;Francisco de Miranda",
+CU:"Havana;Trinidad;Varadero|Fidel Castro;Che Guevara;José Martí",
+GB:"Big Ben;Stonehenge;Edinburgh Kalesi;Londra Kulesi;British Museum|William Shakespeare;Isaac Newton;Charles Darwin;Winston Churchill",
+IE:"Moher Kayalıkları;Dublin;Newgrange|James Joyce;Oscar Wilde;W. B. Yeats",
+FR:"Eyfel Kulesi;Louvre;Versay Sarayı;Mont-Saint-Michel;Côte d'Azur|Napolyon Bonapart;Jeanne d'Arc;Victor Hugo;Marie Curie;Louis Pasteur",
+ES:"Sagrada Família;Elhamra Sarayı;Prado Müzesi;Santiago Yolu|Cervantes;Pablo Picasso;Salvador Dalí;Antoni Gaudí",
+PT:"Belém Kulesi;Lizbon;Sintra;Porto|Vasco da Gama;Fernando Pessoa;Cristiano Ronaldo",
+IT:"Kolezyum;Roma Forumu;Venedik;Pisa Kulesi;Pompei;Floransa|Leonardo da Vinci;Michelangelo;Galileo Galilei;Jül Sezar;Dante",
+DE:"Brandenburg Kapısı;Neuschwanstein Şatosu;Köln Katedrali;Berlin Duvarı|Goethe;Beethoven;J. S. Bach;Karl Marx;Gutenberg",
+NL:"Amsterdam Kanalları;Keukenhof;Rijksmuseum|Rembrandt;Vincent van Gogh;Anne Frank",
+BE:"Brüksel Grand Place;Brugge;Atomium|Hergé;Adolphe Sax;Peter Paul Rubens",
+CH:"Matterhorn;Jungfrau;Luzern;Chillon Şatosu|Carl Jung;Jean Piaget;Roger Federer",
+AT:"Schönbrunn Sarayı;Hallstatt;Salzburg;Viyana|Mozart;Sigmund Freud;Franz Schubert",
+PL:"Krakov Eski Şehir;Wieliczka Tuz Madeni;Auschwitz-Birkenau Anıtı;Varşova|Marie Curie;Kopernik;Frédéric Chopin",
+CZ:"Prag Kalesi;Karl Köprüsü;Český Krumlov|Franz Kafka;Antonín Dvořák;Václav Havel",
+HU:"Budapeşte Parlamentosu;Balaton Gölü;Tuna Kıyıları|Franz Liszt;Béla Bartók;Ernő Rubik",
+GR:"Akropolis;Delfi;Santorini;Meteora|Sokrates;Platon;Aristoteles;Hipokrat",
+SE:"Stockholm Gamla Stan;Vasa Müzesi;Laponya|Alfred Nobel;Astrid Lindgren;Carl von Linné",
+NO:"Norveç Fiyortları;Kuzey Işıkları;Viking Gemileri Müzesi|Roald Amundsen;Edvard Munch;Henrik Ibsen",
+FI:"Rovaniemi;Helsinki;Göller Bölgesi|Jean Sibelius;Tove Jansson;Linus Torvalds",
+DK:"Nyhavn;Tivoli Bahçeleri;Kronborg Şatosu|Hans Christian Andersen;Niels Bohr;Søren Kierkegaard",
+IS:"Gullfoss;Mavi Lagün;Geysir|Leif Eriksson;Björk",
+RU:"Kızıl Meydan;Kremlin;Ermitaj Müzesi;Baykal Gölü|Lev Tolstoy;Dostoyevski;Çaykovski;Büyük Petro;Yuri Gagarin",
+UA:"Kiev Pechersk Lavra;Lviv;Odessa|Taras Şevçenko;Sergey Korolyov;Mikhail Bulgakov",
+RO:"Bran Şatosu;Transilvanya;Peleş Şatosu|Vlad Tepeş;Mircea Eliade;Nadia Comăneci",
+BG:"Rila Manastırı;Sofya;Nesebar|Hristo Botev;Vasil Levski",
+RS:"Belgrad Kalesi;Novi Sad;Studenica Manastırı|Nikola Tesla;Novak Djokovic",
+HR:"Dubrovnik;Plitvice Gölleri;Split Diocletianus Sarayı|Ruđer Bošković;Luka Modrić",
+BA:"Mostar Köprüsü;Saraybosna Başçarşı;Kravice Şelalesi|Aliya İzzetbegoviç;İvo Andriç;Meša Selimović",
+AL:"Berat;Butrint;Gjirokastër|İskender Bey (Skanderbeg);Anne Teresa",
+MK:"Ohrid Gölü;Üsküp Taş Köprü;Matka Kanyonu|Anne Teresa;Büyük İskender",
+EG:"Giza Piramitleri;Sfenks;Luksor;Ebu Simbel;Nil|Tutankhamon;Kleopatra;II. Ramses;Necip Mahfuz",
+MA:"Marakeş;Fes Medinası;Chefchaouen;Sahra Çölü|İbn Battuta;Fatima el-Fihri;Yusuf bin Taşfin",
+TN:"Kartaca Kalıntıları;Sidi Bou Said;El Cem Amfitiyatrosu|Hannibal;İbn Haldun;Habib Burgiba",
+DZ:"Cezayir Kasbah;Timgad;Tassili n'Ajjer|Emir Abdülkadir;Ahmed Ben Bella",
+ZA:"Table Dağı;Kruger Milli Parkı;Cape Town;Robben Adası|Nelson Mandela;Desmond Tutu;Steve Biko",
+KE:"Masai Mara;Amboseli;Nairobi|Jomo Kenyatta;Wangari Maathai;Eliud Kipchoge",
+TZ:"Serengeti;Kilimanjaro;Zanzibar;Ngorongoro Krateri|Julius Nyerere;Freddie Mercury (Zanzibar doğumlu)",
+ET:"Lalibela Kaya Kiliseleri;Aksum;Simien Dağları|Haile Selassie;Abebe Bikila;II. Menelik",
+NG:"Zuma Kayası;Lagos;Olumo Kayası|Chinua Achebe;Wole Soyinka;Fela Kuti",
+GH:"Cape Coast Kalesi;Kakum Milli Parkı;Accra|Kwame Nkrumah;Kofi Annan",
+SN:"Gorée Adası;Retba (Pembe Göl);Dakar|Léopold Senghor;Youssou N'Dour",
+SA:"Mekke ve Medine;Mada'in Salih;Diriyye|Hz. Muhammed;Kral Abdülaziz",
+IR:"Persepolis;İsfahan Nakş-ı Cihan Meydanı;Şiraz;Yezd|Firdevsi;Hafız-ı Şirazi;İbn Sina;Büyük Kyros",
+IQ:"Babil;Kerbela;Necef;Ur Zigguratı;Erbil Kalesi|Hammurabi;Harun Reşid;Fuzuli",
+SY:"Şam Emevi Camii;Palmira;Halep Kalesi|Zenobia;Ebu'l-Ala el-Maarri;Nizar Kabbani",
+LB:"Baalbek;Byblos;Beyrut;Kadisha Vadisi|Halil Cibran;Feyruz",
+JO:"Petra;Wadi Rum;Ölü Deniz;Cerash|I. Abdullah;Kral Hüseyin;Nabatiler",
+IL:"Kudüs Eski Şehir;Masada;Ölü Deniz;Tel Aviv|Hz. Davud;Hz. Süleyman",
+AE:"Burj Halife;Şeyh Zayed Camii;Dubai Marina;Louvre Abu Dhabi|Şeyh Zayed bin Sultan;Şeyh Raşid",
+QA:"İslam Sanatları Müzesi;Souq Waqif;Katara|Şeyh Cassim bin Muhammed",
+AZ:"Bakü İçerişehir;Kız Kulesi;Gobustan;Yanardağ|Haydar Aliyev;Nizami Gencevi;Üzeyir Hacıbeyli",
+GE:"Tiflis;Svaneti;Mtskheta;Kazbegi|Kraliçe Tamar;Şota Rustaveli;IV. Davit",
+AM:"Erivan;Garni Tapınağı;Tatev Manastırı|Komitas;Mesrop Maştots;Aram Haçaturyan",
+KZ:"Bayterek Kulesi (Astana);Almatı;Hoca Ahmed Yesevi Türbesi|Farabi;Abay Kunanbayev;Çokan Valihanov",
+UZ:"Semerkant Registan;Buhara;Hive|Emir Timur;Uluğ Bey;İmam Buhari;Biruni",
+IN:"Tac Mahal;Kızıl Kale;Jaipur;Kerala;Varanasi|Mahatma Gandhi;Jawaharlal Nehru;Rabindranath Tagore;Ramanujan",
+PK:"Lahor Kalesi;Moenjodaro;K2;Hunza Vadisi|Muhammed Ali Cinnah;Muhammed İkbal;Abdus Salam",
+BD:"Sundarbans;Dakka;Cox's Bazar|Şeyh Mücibür Rahman;Muhammed Yunus",
+NP:"Everest Dağı;Katmandu;Lumbini|Buda (Lumbini doğumlu);Tenzing Norgay",
+LK:"Sigiriya;Kandy;Galle Kalesi|Muttiah Muralitharan;Kral Kassapa",
+CN:"Çin Seddi;Yasak Şehir;Terrakota Ordusu;Zhangjiajie|Konfüçyüs;Sun Tzu;Qin Shi Huang;Lao Tzu;Mao Zedong",
+JP:"Fuji Dağı;Kyoto;Fushimi Inari;Hiroşima Barış Anıtı;Tokyo|Oda Nobunaga;Miyamoto Musashi;Hayao Miyazaki;Akira Kurosawa",
+KR:"Gyeongbokgung Sarayı;Jeju Adası;Seul;Bulguksa|Kral Sejong;Amiral Yi Sun-sin;Bong Joon-ho",
+MN:"Karakurum;Gobi Çölü;Hustai Milli Parkı|Cengiz Han;Kubilay Han;Ögeday Han",
+TH:"Bangkok Büyük Saray;Ayutthaya;Phuket;Chiang Mai|V. Rama;Kral Bhumibol",
+VN:"Ha Long Körfezi;Hoi An;Hanoi|Ho Chi Minh;General Võ Nguyên Giáp",
+KH:"Angkor Wat;Siem Reap;Phnom Penh|II. Süryavarman;Norodom Sihanouk",
+ID:"Borobudur;Bali;Komodo Adası;Prambanan|Sukarno;Kartini;Pramoedya Ananta Toer",
+MY:"Petronas Kuleleri;Langkawi;Malakka|Tunku Abdul Rahman;Mahathir Muhammed",
+PH:"Palawan;Banaue Pirinç Terasları;Intramuros|José Rizal;Lapulapu",
+AU:"Sidney Opera Binası;Uluru;Büyük Set Resifi;Melbourne|Ned Kelly;Nellie Melba;Don Bradman",
+NZ:"Milford Sound;Rotorua;Queenstown|Edmund Hillary;Ernest Rutherford;Kate Sheppard"
+};
+const F={
+TR:"Ankara|Döner, baklava, Türk kahvesi|29 Ekim Cumhuriyet Bayramı: 1923'te cumhuriyetin ilanı",
+US:"Washington, D.C.|Hamburger, elmalı turta|4 Temmuz Bağımsızlık Günü: 1776'da bağımsızlık bildirgesinin kabulü",
+CA:"Ottawa|Poutine, akçaağaç şurubu|1 Temmuz Kanada Günü: 1867'de Kanada Konfederasyonu'nun kuruluşu",
+MX:"Mexico City|Taco, mole|16 Eylül Bağımsızlık Günü: 1810'da İspanya'ya karşı başlayan ayaklanma",
+BR:"Brasília|Feijoada|7 Eylül Bağımsızlık Günü: 1822'de Portekiz'den ayrılış",
+AR:"Buenos Aires|Asado, empanada|9 Temmuz Bağımsızlık Günü: 1816'da İspanya'dan bağımsızlık ilanı",
+CL:"Santiago|Empanada, pastel de choclo|18 Eylül Ulusal Gün: 1810'da ilk ulusal yönetimin kurulması",
+PE:"Lima|Ceviche|28 Temmuz Bağımsızlık Günü: 1821'de bağımsızlık ilanı",
+CO:"Bogotá|Bandeja paisa|20 Temmuz Bağımsızlık Günü: 1810'da Bogotá'daki ayaklanma",
+VE:"Karakas|Arepa, pabellón criollo|5 Temmuz Bağımsızlık Günü: 1811'de bağımsızlık bildirgesi",
+CU:"Havana|Ropa vieja|1 Ocak Özgürlük Zaferi Günü: 1959 Küba Devrimi'nin zaferi",
+GB:"Londra|Fish and chips, pazar rostosu|26 Aralık Boxing Day: Noel'in ertesi günü, geleneksel olarak çalışanlara hediye verilen gün",
+IE:"Dublin|Irish stew|17 Mart Aziz Patrick Günü: ülkenin koruyucu azizinin anılması",
+FR:"Paris|Coq au vin, kruvasan|14 Temmuz Ulusal Gün: 1789'da Bastille Hapishanesi'nin basılması",
+ES:"Madrid|Paella, tortilla|12 Ekim Ulusal Gün: 1492'de Kolomb'un Amerika'ya ulaşması",
+PT:"Lizbon|Bacalhau, pastel de nata|10 Haziran Portekiz Günü: şair Camões'in ölüm yıldönümü",
+IT:"Roma|Pizza, makarna|2 Haziran Cumhuriyet Günü: 1946 referandumunda monarşi yerine cumhuriyetin seçilmesi",
+DE:"Berlin|Schnitzel, bratwurst|3 Ekim Birlik Günü: 1990'da Doğu ve Batı Almanya'nın birleşmesi",
+NL:"Amsterdam|Stroopwafel, ringa balığı|27 Nisan Kral Günü: Kral Willem-Alexander'ın doğum günü",
+BE:"Brüksel|Waffle, patates kızartması, çikolata|21 Temmuz Ulusal Gün: 1831'de I. Leopold'ün kral olarak yemin etmesi",
+CH:"Bern|Fondü, raclette|1 Ağustos Ulusal Gün: 1291'deki kuruluş antlaşması",
+AT:"Viyana|Wiener Schnitzel, Sachertorte|26 Ekim Ulusal Gün: 1955'te kalıcı tarafsızlık yasasının kabulü",
+PL:"Varşova|Pierogi|11 Kasım Bağımsızlık Günü: 1918'de 123 yıl sonra yeniden bağımsızlık",
+CZ:"Prag|Svíčková, knedlik|28 Ekim Bağımsız Çekoslovak Devleti Günü: 1918'deki kuruluş",
+HU:"Budapeşte|Gulaş|20 Ağustos Devlet Kuruluş Günü: Kral I. István'ın devleti kurması",
+GR:"Atina|Musakka, souvlaki|25 Mart Bağımsızlık Günü: 1821'de başlayan Yunan bağımsızlık savaşı",
+SE:"Stockholm|İsveç köftesi|6 Haziran Ulusal Gün: 1523'te Gustav Vasa'nın kral seçilmesi",
+NO:"Oslo|Fårikål (kuzu-lahana güveci)|17 Mayıs Anayasa Günü: 1814 anayasasının imzalanması",
+FI:"Helsinki|Karelya böreği|6 Aralık Bağımsızlık Günü: 1917'de Rusya'dan bağımsızlık ilanı",
+DK:"Kopenhag|Smørrebrød|5 Haziran Anayasa Günü: 1849 anayasasının kabulü",
+IS:"Reykjavik|Kuzu çorbası, skyr|17 Haziran Ulusal Gün: 1944'te tam bağımsızlık",
+RU:"Moskova|Pelmeni, borş|12 Haziran Rusya Günü: 1990'da egemenlik bildirgesinin kabulü",
+UA:"Kiev|Borş, vareniki|24 Ağustos Bağımsızlık Günü: 1991'de bağımsızlık ilanı",
+RO:"Bükreş|Sarmale, mămăligă|1 Aralık Ulusal Gün: 1918'de Transilvanya'nın Romanya ile birleşmesi",
+BG:"Sofya|Banitsa, şopska salatası|3 Mart Kurtuluş Günü: 1878'de Osmanlı yönetiminden kurtuluş",
+RS:"Belgrad|Ćevapi, pljeskavica|15 Şubat Devlet Günü: 1804 Birinci Sırp İsyanı ve 1835 anayasası",
+HR:"Zagreb|Peka, pašticada|30 Mayıs Devlet Günü: 1990'da ilk çok partili parlamentonun toplanması",
+BA:"Saraybosna|Ćevapi, burek|1 Mart Bağımsızlık Günü: 1992 bağımsızlık referandumu",
+AL:"Tiran|Tavë kosi, byrek|28 Kasım Bağımsızlık Günü: 1912'de Vlorë'de bağımsızlık ilanı",
+MK:"Üsküp|Tavče gravče|8 Eylül Bağımsızlık Günü: 1991 bağımsızlık referandumu",
+EG:"Kahire|Koşari, ful|23 Temmuz Devrim Günü: 1952'de Hür Subaylar hareketi ve monarşinin sonu",
+MA:"Rabat|Tajin, kuskus|30 Temmuz Tahta Çıkış Günü: Kral VI. Muhammed'in tahta çıkışı",
+TN:"Tunus|Kuskus, brik|20 Mart Bağımsızlık Günü: 1956'da Fransa'dan bağımsızlık",
+DZ:"Cezayir|Kuskus|1 Kasım Devrim Günü: 1954'te kurtuluş savaşının başlaması",
+ZA:"Pretoria (yürütme), Cape Town (yasama), Bloemfontein (yargı)|Braai, bobotie|27 Nisan Özgürlük Günü: 1994'teki ilk çok ırklı seçimler",
+KE:"Nairobi|Nyama choma, ugali|12 Aralık Jamhuri Günü: 1963'te Britanya'dan bağımsızlık",
+TZ:"Dodoma|Ugali, pilav|26 Nisan Birlik Günü: 1964'te Tanganika ve Zanzibar'ın birleşmesi",
+ET:"Addis Ababa|Injera, doro wat|Eylül başı Enkutatash: Etiyopya takvimine göre yeni yıl",
+NG:"Abuja|Jollof pilavı|1 Ekim Bağımsızlık Günü: 1960'ta Britanya'dan bağımsızlık",
+GH:"Accra|Jollof, fufu|6 Mart Bağımsızlık Günü: 1957'de Sahra altı Afrika'da bağımsızlığını kazanan ilk sömürge olması",
+SN:"Dakar|Thieboudienne (balıklı pilav)|4 Nisan Bağımsızlık Günü: 1960'ta Fransa'dan bağımsızlık",
+SA:"Riyad|Kabsa|23 Eylül Ulusal Gün: 1932'de krallığın birleştirilip ilan edilmesi",
+IR:"Tahran|Çelo kebap|11 Şubat Devrim Günü: 1979 İran Devrimi'nin zaferi",
+IQ:"Bağdat|Mesguf (ızgara balık), dolma|3 Ekim Ulusal Gün: 1932'de Milletler Cemiyeti'ne bağımsız devlet olarak kabul",
+SY:"Şam|Kibbe, fettuş|17 Nisan Bağımsızlık Günü: 1946'da Fransız askerlerinin çekilmesi",
+LB:"Beyrut|Tabule, kibbe|22 Kasım Bağımsızlık Günü: 1943'te Fransız mandasının sona ermesi",
+JO:"Amman|Mansaf|25 Mayıs Bağımsızlık Günü: 1946'da bağımsızlık",
+IL:"Kudüs (birçok ülke büyükelçiliğini Tel Aviv'de tutar)|Falafel, humus|Yom Ha'atzmaut (Bağımsızlık Günü): 1948'de devletin ilanı",
+AE:"Abu Dabi|Machbous|2 Aralık Ulusal Gün: 1971'de emirliklerin birleşmesi",
+QA:"Doha|Machboos|18 Aralık Ulusal Gün: 1878'de Şeyh Cassim'in yönetime geçmesi",
+AZ:"Bakü|Plov|28 Mayıs Cumhuriyet Günü: 1918'de Azerbaycan Halk Cumhuriyeti'nin kuruluşu",
+GE:"Tiflis|Hinkali, hacapuri|26 Mayıs Bağımsızlık Günü: 1918'de Gürcistan Demokratik Cumhuriyeti'nin ilanı",
+AM:"Erivan|Dolma, lavaş|21 Eylül Bağımsızlık Günü: 1991 bağımsızlık referandumu",
+KZ:"Astana|Beşbarmak|16 Aralık Bağımsızlık Günü: 1991'de bağımsızlık ilanı",
+UZ:"Taşkent|Özbek pilavı (plov)|1 Eylül Bağımsızlık Günü: 1991'de SSCB'den bağımsızlık",
+IN:"Yeni Delhi|Biryani, butter chicken|26 Ocak Cumhuriyet Günü: 1950'de anayasanın yürürlüğe girmesi",
+PK:"İslamabad|Biryani, nihari|23 Mart Pakistan Günü: 1940 Lahor Kararı",
+BD:"Dakka|Hilsa balığı, pirinç|26 Mart Bağımsızlık Günü: 1971'de bağımsızlık ilanı",
+NP:"Katmandu|Dal bhat, momo|Ekim'deki Dashain: iyiliğin kötülük üzerindeki zaferini kutlayan en büyük bayram",
+LK:"Sri Jayawardenepura Kotte (ticari merkez Kolombo)|Pirinç ve köri|4 Şubat Bağımsızlık Günü: 1948'de Britanya'dan bağımsızlık",
+CN:"Pekin|Pekin ördeği|1 Ekim Ulusal Gün: 1949'da Çin Halk Cumhuriyeti'nin ilanı",
+JP:"Tokyo|Suşi, ramen|11 Şubat Ulusal Kuruluş Günü: efsaneye göre İmparator Jimmu'nun tahta çıkışı",
+KR:"Seul|Kimchi, bibimbap|15 Ağustos Kurtuluş Günü: 1945'te Japon yönetiminin sona ermesi",
+MN:"Ulan Batur|Buuz, khuushuur|11-13 Temmuz Naadam: 1921 halk devrimini anan, güreş-okçuluk-at yarışı bayramı",
+TH:"Bangkok|Pad thai, tom yum|5 Aralık Ulusal Gün: Kral IX. Bhumibol'ün doğum günü",
+VN:"Hanoi|Phở|2 Eylül Ulusal Gün: 1945'te Ho Chi Minh'in bağımsızlık bildirgesini okuması",
+KH:"Phnom Penh|Amok|9 Kasım Bağımsızlık Günü: 1953'te Fransa'dan bağımsızlık",
+ID:"Cakarta|Nasi goreng, rendang|17 Ağustos Bağımsızlık Günü: 1945'te Sukarno'nun bağımsızlık ilanı",
+MY:"Kuala Lumpur|Nasi lemak|31 Ağustos Merdeka Günü: 1957'de Britanya'dan bağımsızlık",
+PH:"Manila|Adobo|12 Haziran Bağımsızlık Günü: 1898'de İspanya'dan bağımsızlık ilanı",
+AU:"Canberra|Meat pie, Vegemite|26 Ocak Avustralya Günü: 1788'de İngiliz filosunun Sydney'e gelişi (yerli halklar için tartışmalı bir gün)",
+NZ:"Wellington|Hāngī, pavlova|6 Şubat Waitangi Günü: 1840'ta Britanya ile Māori şefleri arasındaki antlaşmanın imzalanması"
+};
+function sum(c){
+  const w=document.createElement('div'),f=F[c];
+  w.innerHTML='<h2>Kısaca</h2><div class="fact"></div>';
+  const b=w.querySelector('.fact');
+  if(f){const [k,y,g]=f.split('|');b.innerHTML='<p><b>Başkent:</b> '+k+'</p><p><b>Ünlü yemek:</b> '+y+'</p><p><b>Önemli gün:</b> '+g+'</p>';return w}
+  fetch('https://restcountries.com/v3.1/alpha/'+c+'?fields=capital,population,languages,currencies').then(r=>r.json()).then(j=>{
+    j=Array.isArray(j)?j[0]:j;
+    const L=Object.entries(j.languages||{}).map(([k,v])=>{try{return new Intl.DisplayNames(['tr'],{type:'language'}).of(k)}catch(e){return v}});
+    const M=Object.keys(j.currencies||{}).map(k=>{try{return new Intl.DisplayNames(['tr'],{type:'currency'}).of(k)}catch(e){return k}});
+    let h='';
+    if(j.capital&&j.capital.length)h+='<p><b>Başkent:</b> '+j.capital.join(', ')+'</p>';
+    if(j.population)h+='<p><b>Nüfus:</b> yaklaşık '+(j.population/1e6).toFixed(1)+' milyon</p>';
+    if(L.length)h+='<p><b>Dil:</b> '+L.join(', ')+'</p>';
+    if(M.length)h+='<p><b>Para birimi:</b> '+M.join(', ')+'</p>';
+    if(h)b.innerHTML=h;else w.remove();
+  }).catch(()=>w.remove());
+  return w;
+}
+const dn=new Intl.DisplayNames(['tr'],{type:'region'});
+const nm=c=>{try{return dn.of(c)}catch(e){return c}};
+const flag=c=>/^[A-Z]{2}$/.test(c)?String.fromCodePoint(...[...c].map(x=>127397+x.charCodeAt(0))):'🌍';
+const li=s=>'<ul>'+s.split(';').map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+const panel=document.getElementById('panel'),side=document.getElementById('side');
+function home(){
+  panel.innerHTML='<div class="flag">🌍</div><h1>Dünya Haritası Rehberi</h1><p>Haritada bir ülkeye tıklayın; gezilecek yerler, tarihi mekânlar ve önemli şahsiyetler fotoğraflı kartlar olarak burada yan yana kayar.</p><p>Fare tekerleği veya + / − düğmeleriyle yakınlaşabilir, haritayı sürükleyerek gezebilirsiniz.</p>';
+}
+const cache={};
+function wiki(q,lim,s){
+  s=s||2;const k=q+'|'+lim+'|'+s;
+  return cache[k]||(cache[k]=fetch('https://tr.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit='+lim+'&gsrsearch='+encodeURIComponent(q)+'&prop=pageimages|extracts&piprop=thumbnail&pithumbsize=520&exintro=1&explaintext=1&exsentences='+s+'&exlimit=max')
+    .then(r=>r.json()).then(j=>Object.values((j.query||{}).pages||{}).sort((a,b)=>a.index-b.index))
+    .catch(()=>{delete cache[k];return[]}));
+}
+function mk(title,ico){
+  const a=document.createElement('a');a.className='card';a.target='_blank';a.rel='noopener';
+  a.innerHTML='<div class="ph"></div><div class="tx"><b></b><span></span></div>';
+  a.querySelector('b').textContent=title;return a;
+}
+function fill(a,pg){
+  if(!pg)return;
+  a.href='https://tr.wikipedia.org/?curid='+pg.pageid;
+  a.querySelector('span').textContent=pg.extract||'';
+  if(pg.thumbnail){const im=new Image();im.alt=pg.title;im.onload=()=>{const ph=a.querySelector('.ph');ph.textContent='';ph.appendChild(im)};im.src=pg.thumbnail.source}
+}
+function car(h,cards){
+  const w=document.createElement('div');
+  w.innerHTML='<h2></h2><div class="car"><button class="nv l" aria-label="Geri">‹</button><div class="trk"></div><button class="nv r" aria-label="İleri">›</button></div>';
+  w.querySelector('h2').textContent=h;
+  const t=w.querySelector('.trk');cards.forEach(c=>t.appendChild(c));
+  w.querySelector('.l').onclick=()=>t.scrollBy({left:-t.clientWidth*.8,behavior:'smooth'});
+  w.querySelector('.r').onclick=()=>t.scrollBy({left:t.clientWidth*.8,behavior:'smooth'});
+  return w;
+}
+function items(h,list,ico,n){
+  return car(h,list.split(';').map(x=>{
+    const c=mk(x,ico),q=x.replace(/\s*\(.*\)/,'');
+    c.href='https://tr.wikipedia.org/w/index.php?search='+encodeURIComponent(q);
+    wiki(q+' '+n,3).then(r=>r.find(p=>p.thumbnail)||wiki(q,3).then(r2=>r2.find(p=>p.thumbnail)||r[0]||r2[0])).then(pg=>fill(c,pg));
+    return c;
+  }));
+}
+function auto(h,q,lim,ico){
+  const w=car(h,[]),t=w.querySelector('.trk');
+  wiki(q,lim).then(r=>{if(!r.length){w.remove();return}r.forEach(pg=>{const c=mk(pg.title,ico);fill(c,pg);t.appendChild(c)})});
+  return w;
+}
+function info(h,q,s){
+  const w=document.createElement('div');
+  w.innerHTML='<h2></h2><p class="inf"></p><a class="more" target="_blank" rel="noopener">Vikipedi\'de devamını oku →</a>';
+  w.querySelector('h2').textContent=h;
+  wiki(q,1,s).then(r=>{const pg=r[0];if(!pg||!pg.extract){w.remove();return}w.querySelector('.inf').textContent=pg.extract;w.querySelector('.more').href='https://tr.wikipedia.org/?curid='+pg.pageid});
+  return w;
+}
+function show(code){
+  const hh=document.getElementById('hint');if(hh)hh.remove();
+  document.querySelectorAll('.jvm-region.sel').forEach(e=>e.classList.remove('sel'));
+  const p=document.querySelector('.jvm-region[data-code="'+code+'"]');
+  if(p)p.classList.add('sel');
+  const n=nm(code),d=D[code];
+  panel.innerHTML='<div class="flag">'+flag(code)+'</div><h1></h1>';
+  panel.querySelector('h1').textContent=n;
+  panel.append(sum(code));
+  if(d){
+    const [a,b]=d.split('|');
+    panel.append(items('Gezilecek & tarihi yerler',a,'📍',n),items('Önemli şahsiyetler',b,'👤',n));
+  }else{
+    const q=document.createElement('p');q.textContent="Bu ülke için hazır liste yok; içerik Vikipedi'den otomatik getiriliyor.";
+    panel.append(q,auto('Ülke hakkında',n,1,'🌍'),auto('Gezilecek yerler',n+' turistik yerler',6,'📍'));
+  }
+  panel.append(info('Ülke hakkında',n,7),info('Tarihçe',n+' tarihi',6),info('Coğrafya ve doğa',n+' coğrafyası',5));
+  side.scrollTop=0;side.classList.add('open');
+}
+const stage=document.getElementById('stage'),mapEl=document.getElementById('map');
+const MD=(jsVectorMap.maps||{}).world||{},R=(MD.width/MD.height)||1.9;let M;
+function fit(){
+  const W=stage.clientWidth,H=stage.clientHeight;if(!W||!H)return;
+  let w=W,h=W/R;if(h>H){h=H;w=H*R}
+  mapEl.style.width=w+'px';mapEl.style.height=h+'px';
+  mapEl.style.transform='translate(-50%,-50%) scale('+Math.min(W/w,1.4)+','+Math.min(H/h,1.4)+')';
+  if(M){M.updateSize?M.updateSize():window.dispatchEvent(new Event('resize'))}
+}
+fit();
+M=new jsVectorMap({
+  selector:'#map',map:'world',backgroundColor:'transparent',
+  zoomButtons:false,zoomOnScroll:false,zoomMin:1,zoomMax:1,showTooltip:true,
+  onRegionTooltipShow(e,t,code){t.text(nm(code))},
+  onRegionClick(e,code){show(code)}
+});
+new ResizeObserver(fit).observe(stage);
+document.getElementById('x').onclick=()=>{side.classList.remove('open');document.querySelectorAll('.jvm-region.sel').forEach(e=>e.classList.remove('sel'))};
+</script>
+</body>
+</html>
