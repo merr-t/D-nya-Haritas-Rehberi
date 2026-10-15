@@ -48,13 +48,14 @@ a{color:var(--hov)}
 .jvm-tooltip.active{display:block}
 /* Arama menüsü */
 #search{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(420px,calc(100% - 28px));z-index:10}
+.sbar{position:relative}
 #q{width:100%;box-sizing:border-box;padding:11px 40px 11px 42px;border-radius:999px;border:0;background:var(--panel);color:var(--tx);font:inherit;font-size:1rem;box-shadow:0 2px 12px rgba(0,0,0,.28);outline:none}
 #q:focus{box-shadow:0 2px 12px rgba(0,0,0,.28),0 0 0 2px var(--hov)}
 #q::placeholder{color:var(--mut)}
 .sico{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:18px;height:18px;pointer-events:none;color:var(--mut)}
 #qc{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:26px;height:26px;border:0;border-radius:50%;background:var(--chip);color:var(--tx);font-size:16px;line-height:1;cursor:pointer;display:none}
 #search.has #qc{display:block}
-#res{display:none;margin-top:6px;padding:6px;background:var(--panel);border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.3);max-height:min(50vh,340px);overflow:auto;overscroll-behavior:contain}
+#res{display:none;position:relative;margin-top:6px;padding:6px;background:var(--panel);border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.3);max-height:min(50vh,340px);overflow:auto;overscroll-behavior:contain}
 #res.open{display:block}
 .opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:.95rem}
 .opt.on,.opt:hover{background:var(--chip)}
@@ -69,17 +70,19 @@ a{color:var(--hov)}
   <aside id="side"><button id="x" aria-label="Kapat">×</button><div id="panel"></div></aside>
   <div id="stage">
     <div id="search" role="search">
-      <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Ülke ara…" aria-label="Ülke ara" role="combobox" aria-expanded="false" aria-controls="res">
-      <button id="qc" aria-label="Aramayı temizle">×</button>
+      <div class="sbar">
+        <svg class="sico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="q" type="text" autocomplete="off" spellcheck="false" placeholder="Ülke ara…" aria-label="Ülke ara" role="combobox" aria-expanded="false" aria-controls="res">
+        <button id="qc" aria-label="Aramayı temizle">×</button>
+      </div>
       <div id="res" role="listbox"></div>
     </div>
     <div id="hint">Bir ülkeye tıklayın veya arayın</div>
     <div id="map"></div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js" crossorigin="anonymous"></script>
 <script>
 // Format: KOD:"Gezilecek ve tarihi yerler|Önemli şahsiyetler"
 const D={
@@ -335,9 +338,9 @@ function info(h,q,s){
 }
 function show(code){
   const hh=document.getElementById('hint');if(hh)hh.remove();
-  document.querySelectorAll('.jvm-region.sel').forEach(e=>e.classList.remove('sel'));
-  const p=document.querySelector('.jvm-region[data-code="'+code+'"]');
-  if(p){p.classList.add('sel');if(p.parentNode)p.parentNode.appendChild(p)} // seçili ülkenin çerçevesi üstte görünsün
+  document.querySelectorAll('#map .sel').forEach(e=>e.classList.remove('sel'));
+  const p=(typeof NODES!=='undefined'&&NODES[code])||null;
+  if(p)p.classList.add('sel');
   const n=nm(code),d=D[code];
   panel.innerHTML='';
   panel.append(flagEl(code));
@@ -354,13 +357,13 @@ function show(code){
   side.scrollTop=0;side.classList.add('open');
 }
 const stage=document.getElementById('stage'),mapEl=document.getElementById('map');
-const MD=(jsVectorMap.maps||{}).world||{},R=(MD.width/MD.height)||1.9;let M;
+const R=900/440.7;let M; // dünya haritasının en-boy oranı (kütüphane harita verisini dışarı açmaz)
 function fit(){
   const W=stage.clientWidth,H=stage.clientHeight;if(!W||!H)return;
   let w=W,h=W/R;if(h>H){h=H;w=H*R}
   mapEl.style.width=w+'px';mapEl.style.height=h+'px';
   mapEl.style.transform='translate(-50%,-50%) scale('+Math.min(W/w,1.4)+','+Math.min(H/h,1.4)+')';
-  if(M){M.updateSize?M.updateSize():window.dispatchEvent(new Event('resize'))}
+  if(M&&M.container&&M.canvas){try{M.updateSize()}catch(e){}}
 }
 fit();
 M=new jsVectorMap({
@@ -370,46 +373,68 @@ M=new jsVectorMap({
   onRegionClick(e,code){show(code)}
 });
 new ResizeObserver(fit).observe(stage);
-document.getElementById('x').onclick=()=>{side.classList.remove('open');document.querySelectorAll('.jvm-region.sel').forEach(e=>e.classList.remove('sel'))};
+document.getElementById('x').onclick=()=>{side.classList.remove('open');document.querySelectorAll('#map .sel').forEach(e=>e.classList.remove('sel'))};
 
-/* ---------- Bayrakları ülkelerin üstüne yerleştir ---------- */
+/* ---------- Ülke yollarını haritanın kendi DOM'undan al ---------- */
+const NODES={};
+function collectNodes(){
+  mapEl.querySelectorAll('path[data-code]').forEach(p=>{
+    const c=p.getAttribute('data-code');
+    if(isCode(c)){NODES[c]=p;p.classList.add('jvm-region')}
+  });
+}
+
+/* ---------- Bayrakları ülke sınırlarının içine yerleştir ---------- */
+function loadFlag(c,w,cb){
+  const u=['https://flagcdn.com/w'+w+'/'+c.toLowerCase()+'.png','https://flagsapi.com/'+c+'/flat/64.png'];
+  let i=0;const im=new Image();
+  im.onload=()=>cb(im.src);
+  im.onerror=()=>{i++;if(i<u.length)im.src=u[i];else cb(null)};
+  im.src=u[0];
+}
 function applyFlags(){
   const svg=mapEl.querySelector('svg');if(!svg)return;
   const NS='http://www.w3.org/2000/svg',XL='http://www.w3.org/1999/xlink';
+  const holder=document.createElementNS(NS,'svg');
+  holder.setAttribute('aria-hidden','true');
+  holder.style.cssText='position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
   const defs=document.createElementNS(NS,'defs');
-  svg.insertBefore(defs,svg.firstChild);
+  holder.appendChild(defs);document.body.appendChild(holder);
   let css='';
-  mapEl.querySelectorAll('.jvm-region').forEach(p=>{
-    const c=p.getAttribute('data-code');if(!isCode(c))return;
-    let b;try{b=p.getBBox()}catch(e){return}
+  Object.keys(NODES).forEach(c=>{
+    if(!isCode(c))return;
+    const p=NODES[c];let b;
+    try{b=p.getBBox()}catch(e){return}
     if(!b||!b.width||!b.height)return;
     const id='fl-'+c,pt=document.createElementNS(NS,'pattern');
+    // Desen karosu ülkenin sınır kutusuna oturur; içerik kendi sol-üst köşesinden (0,0) başlar
     pt.setAttribute('id',id);pt.setAttribute('patternUnits','userSpaceOnUse');
-    ['x','y','width','height'].forEach(k=>pt.setAttribute(k,b[k]));
-    // Bayrak yüklenemezse arkada düz kara rengi (--land) görünsün
+    pt.setAttribute('x',b.x);pt.setAttribute('y',b.y);pt.setAttribute('width',b.width);pt.setAttribute('height',b.height);
+    // Bayrak gelene kadar (veya hiç gelmezse) arkada düz kara rengi görünsün
     const bg=document.createElementNS(NS,'rect');
-    ['x','y','width','height'].forEach(k=>bg.setAttribute(k,b[k]));
+    bg.setAttribute('x',0);bg.setAttribute('y',0);bg.setAttribute('width',b.width);bg.setAttribute('height',b.height);
     bg.setAttribute('style','fill:var(--land)');
     const im=document.createElementNS(NS,'image');
-    ['x','y','width','height'].forEach(k=>im.setAttribute(k,b[k]));
+    im.setAttribute('x',0);im.setAttribute('y',0);im.setAttribute('width',b.width);im.setAttribute('height',b.height);
     im.setAttribute('preserveAspectRatio','xMidYMid slice');
-    const u=flagUrl(c,320);
-    im.setAttribute('href',u);im.setAttributeNS(XL,'xlink:href',u);
     pt.appendChild(bg);pt.appendChild(im);defs.appendChild(pt);
-    css+='.jvm-region[data-code="'+c+'"]{fill:url(#'+id+')!important}\n';
+    p.setAttribute('data-flag',c);
+    css+='[data-flag="'+c+'"]{fill:url(#'+id+')!important}\n';
+    loadFlag(c,320,src=>{if(src){im.setAttribute('href',src);im.setAttributeNS(XL,'xlink:href',src)}});
   });
   const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 }
-applyFlags();
 
 /* ---------- Arama menüsü ---------- */
 const q=document.getElementById('q'),res=document.getElementById('res'),sbox=document.getElementById('search'),qc=document.getElementById('qc');
-const norm=s=>(s||'').toLocaleLowerCase('tr').replace(/ı/g,'i').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const norm=s=>(s||'').toLocaleLowerCase('tr').replace(/ı/g,'i').normalize('NFD').replace(/[̀-ͯ]/g,'');
 const dnEn=new Intl.DisplayNames(['en'],{type:'region'});
-const LIST=[...mapEl.querySelectorAll('.jvm-region')].map(e=>e.getAttribute('data-code')).filter(isCode).map(c=>{
+// Ülke listesi doğrudan harita verisinden gelir (DOM öznitelikleri olmasa da çalışır)
+let LIST=[];
+function buildList(){LIST=Object.keys(NODES).filter(isCode).map(c=>{
   const n=nm(c);let e='';try{e=dnEn.of(c)}catch(_){}
   return{c,n,k:norm(n),e:norm(e),cc:c.toLowerCase()};
-}).sort((a,b)=>a.n.localeCompare(b.n,'tr'));
+}).sort((a,b)=>a.n.localeCompare(b.n,'tr'))}
 let cur=[],idx=-1;
 function render(){
   const t=norm(q.value.trim());
@@ -425,37 +450,65 @@ function render(){
   idx=cur.length&&t?0:-1;
   res.innerHTML='';
   if(!cur.length){const d=document.createElement('div');d.className='none';d.textContent='Sonuç bulunamadı';res.appendChild(d)}
-  cur.forEach((o,i)=>{
-    const d=document.createElement('div');d.className='opt';d.setAttribute('role','option');d.dataset.i=i;
+  cur.forEach(o=>{
+    const d=document.createElement('div');d.className='opt';d.setAttribute('role','option');
     const im=new Image();im.alt='';im.loading='lazy';im.src=flagUrl(o.c,40);
+    im.onerror=()=>{im.remove()};
     const s=document.createElement('span');s.textContent=o.n;
     const sm=document.createElement('small');sm.textContent=o.c;
     d.append(im,s,sm);
-    d.addEventListener('mousedown',e=>{e.preventDefault();pick(o.c)});
+    d.addEventListener('mousedown',e=>e.preventDefault());
+    d.addEventListener('click',()=>pick(o.c));
     res.appendChild(d);
   });
+  res.scrollTop=0;
   mark();
 }
 function mark(){
-  res.querySelectorAll('.opt').forEach((e,i)=>e.classList.toggle('on',i===idx));
-  const on=res.querySelector('.opt.on');if(on)on.scrollIntoView({block:'nearest'});
+  const opts=res.querySelectorAll('.opt');
+  opts.forEach((e,i)=>e.classList.toggle('on',i===idx));
+  const on=opts[idx];
+  if(on){
+    const t=on.offsetTop,b=t+on.offsetHeight;
+    if(t<res.scrollTop)res.scrollTop=Math.max(0,t-6);
+    else if(b>res.scrollTop+res.clientHeight)res.scrollTop=b-res.clientHeight+6;
+  }
 }
+function isOpen(){return res.classList.contains('open')}
 function openRes(){render();res.classList.add('open');q.setAttribute('aria-expanded','true')}
 function closeRes(){res.classList.remove('open');q.setAttribute('aria-expanded','false')}
 function pick(c){
   q.value=nm(c);sbox.classList.add('has');closeRes();q.blur();show(c);
 }
 q.addEventListener('focus',openRes);
+q.addEventListener('click',()=>{if(!isOpen())openRes()});
 q.addEventListener('input',()=>{sbox.classList.toggle('has',!!q.value);openRes()});
 q.addEventListener('keydown',e=>{
-  if(e.key==='ArrowDown'){e.preventDefault();if(!res.classList.contains('open'))openRes();if(cur.length){idx=(idx+1)%cur.length;mark()}}
-  else if(e.key==='ArrowUp'){e.preventDefault();if(cur.length){idx=(idx-1+cur.length)%cur.length;mark()}}
-  else if(e.key==='Enter'){e.preventDefault();const o=cur[idx>=0?idx:0];if(o)pick(o.c)}
+  if(e.key==='ArrowDown'){e.preventDefault();if(!isOpen())openRes();if(cur.length){idx=(idx+1)%cur.length;mark()}}
+  else if(e.key==='ArrowUp'){e.preventDefault();if(!isOpen())openRes();if(cur.length){idx=(idx-1+cur.length)%cur.length;mark()}}
+  else if(e.key==='Enter'){e.preventDefault();const o=idx>=0?cur[idx]:null;if(o)pick(o.c)}
   else if(e.key==='Escape'){closeRes();q.blur()}
 });
 qc.addEventListener('click',()=>{q.value='';sbox.classList.remove('has');q.focus();openRes()});
 document.addEventListener('mousedown',e=>{if(!e.target.closest('#search'))closeRes()});
 document.addEventListener('touchstart',e=>{if(!e.target.closest('#search'))closeRes()},{passive:true});
+
+/* ---------- Harita hazır olunca çalıştır ----------
+   jsvectormap, sayfa hâlâ yükleniyorsa kurulumunu DOMContentLoaded'a erteler;
+   ülke yolları, bayraklar ve arama listesi ancak bundan sonra oluşturulabilir. */
+let booted=false;
+function boot(){
+  if(booted||!(M&&M.container&&M.canvas))return false;
+  booted=true;
+  collectNodes();
+  try{applyFlags()}catch(err){console.error('bayraklar yerleştirilemedi',err)}
+  buildList();
+  fit();
+  return true;
+}
+if(!boot()){
+  window.addEventListener('DOMContentLoaded',()=>{if(!boot()){const t=setInterval(()=>{if(boot())clearInterval(t)},30)}});
+}
 </script>
 </body>
 </html>
